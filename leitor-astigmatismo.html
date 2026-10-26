@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Leitor para copiar no caderno</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Lexend:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4ecd8;--fg:#2b2620;--mut:#6b6254;--card:#ece2c8;--acc:#2f6b5e;--hl:#fff6c9;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root[data-theme="cinza"]{--bg:#e6e6e3;--fg:#262626;--mut:#5f5f5f;--card:#d9d9d5;--acc:#365f8a;--hl:#f7f7dc}
+:root[data-theme="azul"]{--bg:#e2ebf0;--fg:#1f2a33;--mut:#55656f;--card:#d3dfe6;--acc:#2f6b5e;--hl:#fffbd6}
+:root[data-theme="escuro"]{--bg:#23262b;--fg:#ddd7c9;--mut:#9a958a;--card:#2e3238;--acc:#8fc7b6;--hl:#3a3f2c}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:'Atkinson Hyperlegible',Verdana,sans-serif;min-height:100vh}
+header{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;justify-content:space-between;padding:.8rem 1rem;background:var(--card)}
+h1{font-size:1.05rem;margin:0}
+button,select{font:inherit;font-size:1rem;padding:.55rem .9rem;border-radius:10px;border:2px solid var(--acc);background:transparent;color:var(--fg);cursor:pointer}
+button.pri{background:var(--acc);color:var(--bg);font-weight:700}
+button:disabled{opacity:.4}
+.bar{display:flex;gap:.5rem;flex-wrap:wrap}
+#input{padding:1rem;max-width:900px;margin:0 auto}
+textarea{width:100%;min-height:55vh;font:inherit;font-size:1.2rem;line-height:1.7;padding:1rem;border-radius:12px;border:2px solid var(--mut);background:var(--bg);color:var(--fg);resize:vertical}
+details{background:var(--card);margin:.6rem 1rem;border-radius:12px;padding:.6rem 1rem}
+summary{cursor:pointer;font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.8rem 1.2rem;margin-top:.8rem}
+label{display:flex;flex-direction:column;gap:.25rem;font-size:.95rem;color:var(--mut)}
+input[type=range]{width:100%;accent-color:var(--acc)}
+#reader{display:none;padding:1.5rem 1rem 6rem}
+#text{margin:0 auto;max-width:var(--w,60ch);font-size:var(--fs,26px);line-height:var(--lh,1.9);letter-spacing:var(--ls,.04em);word-spacing:var(--ws,.12em);text-align:left;hyphens:none}
+#text p{margin:0 0 1.1em;padding:.2em .5em;border-radius:8px;cursor:pointer;transition:opacity .15s}
+#text.focus p{opacity:.4}
+#text.focus p.on{opacity:1;background:var(--hl);color:var(--fg)}
+#chunk{min-height:40vh;display:flex;align-items:center}
+#chunk div{background:var(--hl);color:var(--fg);padding:1.2em 1.4em;border-radius:14px;width:100%}
+.nav{position:fixed;left:0;right:0;bottom:0;display:flex;gap:.6rem;justify-content:center;align-items:center;padding:.7rem .7rem calc(.7rem + env(safe-area-inset-bottom,0px));background:var(--card)}
+.nav span{min-width:7ch;text-align:center;color:var(--mut)}
+@media (prefers-color-scheme:dark){:root:not([data-theme]){}}
+</style>
+</head>
+<body>
+<header>
+  <h1>📓 Leitor para copiar no caderno</h1>
+  <div class="bar">
+    <button id="bNovo">Colar outro texto</button>
+    <select id="mode" aria-label="Modo"><option value="full">Texto inteiro</option><option value="chunk">Bloco a bloco</option></select>
+  </div>
+</header>
+
+<details id="cfg">
+  <summary>Ajustes de leitura (fonte, tamanho, espaçamento, cores)</summary>
+  <div class="grid">
+    <label>Fonte
+      <select id="font">
+        <option value="'Atkinson Hyperlegible',Verdana,sans-serif">Atkinson Hyperlegible</option>
+        <option value="'Lexend',Verdana,sans-serif">Lexend</option>
+        <option value="Verdana,Geneva,sans-serif">Verdana</option>
+        <option value="Georgia,serif">Georgia (com serifa)</option>
+      </select></label>
+    <label>Cores
+      <select id="theme"><option value="creme">Creme (papel)</option><option value="cinza">Cinza suave</option><option value="azul">Azul pálido</option><option value="escuro">Escuro suave</option></select></label>
+    <label>Tamanho: <b id="vfs"></b><input type="range" id="fs" min="18" max="48" step="1"></label>
+    <label>Altura da linha: <b id="vlh"></b><input type="range" id="lh" min="1.4" max="2.6" step="0.1"></label>
+    <label>Espaço entre letras: <b id="vls"></b><input type="range" id="ls" min="0" max="0.15" step="0.01"></label>
+    <label>Largura do texto: <b id="vw"></b><input type="range" id="w" min="30" max="80" step="2"></label>
+    <label>Palavras por bloco: <b id="vn"></b><input type="range" id="n" min="5" max="60" step="1"></label>
+    <label><span>Foco no parágrafo (toque para destacar)</span><select id="focus"><option value="1">Ligado</option><option value="0">Desligado</option></select></label>
+  </div>
+</details>
+
+<section id="input">
+  <p>Cole o texto abaixo e aperte <b>Ler</b>.</p>
+  <textarea id="ta" placeholder="Cole aqui o texto que você quer copiar…"></textarea>
+  <p><button class="pri" id="bLer">Ler</button></p>
+</section>
+
+<section id="reader">
+  <div id="text"></div>
+  <div class="nav" id="nav" hidden>
+    <button id="prev">← Anterior</button><span id="pos"></span><button class="pri" id="next">Próximo →</button>
+  </div>
+</section>
+
+<script>
+const $=id=>document.getElementById(id), root=document.documentElement;
+const def={font:$('font').options[0].value,theme:'creme',fs:26,lh:1.9,ls:0.04,w:60,n:18,focus:'1',mode:'full'};
+let S={...def}, chunks=[], idx=0, text='';
+try{Object.assign(S,JSON.parse(localStorage.getItem('leitor-cfg')||'{}'));text=localStorage.getItem('leitor-txt')||''}catch(e){}
+const save=()=>{try{localStorage.setItem('leitor-cfg',JSON.stringify(S))}catch(e){}};
+
+function apply(){
+  root.dataset.theme=S.theme;
+  root.style.setProperty('--fs',S.fs+'px');root.style.setProperty('--lh',S.lh);
+  root.style.setProperty('--ls',S.ls+'em');root.style.setProperty('--ws',(S.ls*3+.04)+'em');
+  root.style.setProperty('--w',S.w+'ch');document.body.style.fontFamily=S.font;
+  $('text').style.fontFamily=S.font;
+  ['fs','lh','ls','w','n'].forEach(k=>{$(k).value=S[k]});
+  $('vfs').textContent=S.fs+'px';$('vlh').textContent=S.lh;$('vls').textContent=S.ls;$('vw').textContent=S.w;$('vn').textContent=S.n;
+  $('font').value=S.font;$('theme').value=S.theme;$('focus').value=S.focus;$('mode').value=S.mode;
+  $('text').classList.toggle('focus',S.focus==='1'&&S.mode==='full');
+}
+['fs','lh','ls','w','n'].forEach(k=>$(k).oninput=e=>{S[k]=+e.target.value;apply();save();if(k==='n'){const r=idx/Math.max(chunks.length,1);build();idx=Math.min(Math.floor(r*chunks.length),chunks.length-1);if(S.mode==='chunk')render()}});
+['font','theme','focus'].forEach(k=>$(k).onchange=e=>{S[k]=e.target.value;apply();save();if(k==='focus')render()});
+$('mode').onchange=e=>{S.mode=e.target.value;apply();save();render()};
+
+function build(){
+  const sents=text.replace(/\r/g,'').match(/[^.!?\n]+[.!?]*["')»]*\s*|\n+/g)||[];
+  chunks=[];let cur='',cnt=0;
+  for(const s of sents){
+    if(/^\n+$/.test(s)){if(cur.trim()){chunks.push(cur.trim());cur='';cnt=0}continue}
+    cur+=s;cnt+=s.trim().split(/\s+/).length;
+    if(cnt>=S.n){chunks.push(cur.trim());cur='';cnt=0}
+  }
+  if(cur.trim())chunks.push(cur.trim());
+}
+function esc(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function render(){
+  const t=$('text');
+  if(S.mode==='chunk'){
+    t.classList.remove('focus');
+    t.innerHTML='<div id="chunk"><div>'+esc(chunks[idx]||'')+'</div></div>';
+    $('nav').hidden=false;$('pos').textContent=(idx+1)+' / '+chunks.length;
+    $('prev').disabled=idx===0;$('next').disabled=idx>=chunks.length-1;
+    scrollTo(0,0);
+  }else{
+    $('nav').hidden=true;
+    t.classList.toggle('focus',S.focus==='1');
+    t.innerHTML=text.split(/\n+/).filter(p=>p.trim()).map(p=>'<p>'+esc(p.trim())+'</p>').join('');
+  }
+}
+$('text').addEventListener('click',e=>{const p=e.target.closest('p');if(!p)return;
+  document.querySelectorAll('#text p.on').forEach(x=>x.classList.remove('on'));p.classList.add('on')});
+const go=d=>{if(S.mode!=='chunk')return;idx=Math.max(0,Math.min(chunks.length-1,idx+d));render()};
+$('prev').onclick=()=>go(-1);$('next').onclick=()=>go(1);
+addEventListener('keydown',e=>{if($('reader').style.display!=='block')return;
+  if(e.key==='ArrowRight'||e.key===' '&&S.mode==='chunk'){e.preventDefault();go(1)}
+  if(e.key==='ArrowLeft')go(-1)});
+
+function show(r){$('input').style.display=r?'none':'block';$('reader').style.display=r?'block':'none';$('bNovo').style.visibility=r?'visible':'hidden';$('mode').style.visibility=r?'visible':'hidden'}
+$('bLer').onclick=()=>{text=$('ta').value.trim();if(!text){$('ta').focus();return}
+  try{localStorage.setItem('leitor-txt',text)}catch(e){}
+  idx=0;build();show(true);render();scrollTo(0,0)};
+$('bNovo').onclick=()=>{show(false);$('ta').focus()};
+
+$('ta').value=text;apply();show(false);
+</script>
+</body>
+</html>
